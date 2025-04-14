@@ -90,8 +90,8 @@
         }
         
         .player {
-            width: 30px;
-            height: 30px;
+            width: 50px;
+            height: 50px;
             position: absolute;
             top: 5px;
             left: 5px;
@@ -100,13 +100,13 @@
         }
         
         .dog {
-            background-color: white;
-            border: 2px solid #555;
+            background-color: transparent;
+            border: 0px solid #555;
         }
         
         .cat {
-            background-color: orange;
-            border: 2px solid #555;
+            background-color: transparent;
+            border: 0px solid #555;
         }
         
         .celebration {
@@ -163,7 +163,6 @@
 <body>
     <div class="game-container">
         <h1>Collaborative Maze Game</h1>
-        
         <div class="game-info">
             <div class="player-info">
                 <h3>White Dog (Player 1)</h3>
@@ -284,7 +283,7 @@
             if (cellIndex >= 0 && cellIndex < cells.length) {
                 const playerElement = document.createElement('div');
                 playerElement.className = `player ${player}`;
-                playerElement.innerHTML = player === 'dog' ? '🐕' : '🐱';
+                playerElement.innerHTML = player === 'dog' ? '🐶' : '🐱';
                 cells[cellIndex].appendChild(playerElement);
             }
         }
