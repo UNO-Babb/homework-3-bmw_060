@@ -149,6 +149,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
+            margin: 5px;
         }
         
         button:hover {
@@ -157,6 +158,79 @@
         
         .icon {
             font-size: 20px;
+        }
+        
+        /* Save Game Modal Styles */
+        #save-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 400px;
+            position: relative;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .save-form {
+            margin-top: 20px;
+            clear: both;
+        }
+        
+        #save-filename {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        
+        .game-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        
+        .save-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .success {
+            background-color: #C8E6C9;
+            color: #2E7D32;
+        }
+        
+        .error {
+            background-color: #FFCDD2;
+            color: #C62828;
         }
     </style>
 </head>
@@ -181,6 +255,23 @@
         <div style="margin-top: 20px;">
             <p><strong>Legend:</strong></p>
             <p>⬛ Black Wall (Impassable) | 🟧 Orange Wall (Cat Only) | ⬜ White Wall (Dog Only) | 🚪 Start | 🏁 Finish | 🔴 Hazard | 🔵 Switch</p>
+        </div>
+        
+        <div class="game-controls">
+            <button id="save-game" onclick="openSaveModal()">Save Game</button>
+        </div>
+    </div>
+    
+    <!-- Save Game Modal -->
+    <div id="save-modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSaveModal()">&times;</span>
+            <h2>Save Game</h2>
+            <div class="save-form">
+                <input type="text" id="save-filename" placeholder="Enter a filename (e.g., my_game)" autocomplete="off">
+                <button id="confirm-save" onclick="saveGame()">Save</button>
+                <div id="save-message" class="save-message"></div>
+            </div>
         </div>
     </div>
     
@@ -248,7 +339,7 @@
                             break;
                         case 6: // Switch
                             cell.classList.add('switch');
-                            if (gameState.switches.some(s => s.x === x && s.y === y && s.active)) {
+                            if (gameState.switches && gameState.switches.some(s => s.x === x && s.y === y && s.active)) {
                                 cell.innerHTML = '<span class="icon">🔵</span>';
                             } else {
                                 cell.innerHTML = '<span class="icon">✅</span>';
@@ -257,7 +348,7 @@
                     }
                     
                     // Add hazards
-                    if (gameState.hazards.some(h => h.x === x && h.y === y)) {
+                    if (gameState.hazards && gameState.hazards.some(h => h.x === x && h.y === y)) {
                         cell.classList.add('hazard');
                         cell.innerHTML = '<span class="icon">🔴</span>';
                     }
@@ -271,8 +362,10 @@
             }
             
             // Add players
-            addPlayer('dog', gameState.players.dog.x, gameState.players.dog.y);
-            addPlayer('cat', gameState.players.cat.x, gameState.players.cat.y);
+            if (gameState.players) {
+                addPlayer('dog', gameState.players.dog.x, gameState.players.dog.y);
+                addPlayer('cat', gameState.players.cat.x, gameState.players.cat.y);
+            }
         }
         
         // Add a player to the maze
@@ -294,17 +387,114 @@
             document.addEventListener('keydown', function(e) {
                 keyState[e.key] = true;
                 handleKeyInput(e.key);
-                e.preventDefault(); // Prevent scrolling when using arrow keys
+                
+                // Don't prevent default on input fields
+                if (e.target.tagName !== 'INPUT') {
+                    e.preventDefault(); // Prevent scrolling when using arrow keys
+                }
             });
             
             document.addEventListener('keyup', function(e) {
                 keyState[e.key] = false;
-                e.preventDefault();
+                
+                // Don't prevent default on input fields
+                if (e.target.tagName !== 'INPUT') {
+                    e.preventDefault();
+                }
             });
+            
+            // Enter key for save form
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && document.getElementById('save-modal').style.display === 'block') {
+                    const filenameInput = document.getElementById('save-filename');
+                    if (document.activeElement === filenameInput) {
+                        saveGame();
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+        
+        // Open save game modal
+        function openSaveModal() {
+            const modal = document.getElementById('save-modal');
+            modal.style.display = 'block';
+            
+            const filenameInput = document.getElementById('save-filename');
+            filenameInput.value = '';
+            
+            // Use setTimeout to ensure the DOM is updated before focusing
+            setTimeout(() => {
+                filenameInput.focus();
+            }, 100);
+            
+            document.getElementById('save-message').style.display = 'none';
+        }
+        
+        // Close save game modal
+        function closeSaveModal() {
+            document.getElementById('save-modal').style.display = 'none';
+        }
+        
+        // Save the game state
+        function saveGame() {
+            const filename = document.getElementById('save-filename').value.trim();
+            
+            if (!filename) {
+                showSaveMessage('Please enter a filename', 'error');
+                return;
+            }
+            
+            // Create a data object with the current game state
+            const saveData = {
+                filename: filename,
+                maze: maze,
+                gameState: gameState
+            };
+            
+            // Send the save request to the server
+            fetch('/save-game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(saveData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error saving game');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showSaveMessage(`Game saved successfully as "${filename}"`, 'success');
+                    setTimeout(closeSaveModal, 2000);
+                } else {
+                    showSaveMessage(data.message || 'Failed to save game', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving game:', error);
+                showSaveMessage('Error saving game. Please try again.', 'error');
+            });
+        }
+        
+        // Show save message
+        function showSaveMessage(message, type) {
+            const messageElement = document.getElementById('save-message');
+            messageElement.textContent = message;
+            messageElement.className = 'save-message ' + type;
+            messageElement.style.display = 'block';
         }
         
         // Handle keyboard input for player movement
         function handleKeyInput(key) {
+            // Don't process game controls if we're in an input field
+            if (document.activeElement.tagName === 'INPUT') {
+                return;
+            }
+            
             let player = null;
             let direction = null;
             
@@ -333,75 +523,58 @@
             } else if (key === 'a' || key === 'A') {
                 player = 'cat';
                 direction = 'left';
-            } else if (key === 'd' || key === 'D') {
+            }             else if (key === 'd' || key === 'D') {
                 player = 'cat';
                 direction = 'right';
             }
-            
+
+            // If a valid player and direction are detected, send the move
             if (player && direction) {
-                movePlayer(player, direction);
+                sendMove(player, direction);
             }
         }
-        
-        // Send player movement to server
-        function movePlayer(player, direction) {
+
+        // Send a move request to the server
+        function sendMove(player, direction) {
             fetch('/move', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    player: player,
-                    direction: direction
-                })
+                body: JSON.stringify({ player, direction })
             })
-            .then(response => response.json())
-            .then(data => {
-                gameState = data;
-                renderMaze();
-                
-                if (gameState.celebrating) {
-                    showCelebration();
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to move player');
                 }
+                return response.json();
             })
-            .catch(error => console.error('Error moving player:', error));
-        }
-        
-        // Show celebration when both players reach the finish
-        function showCelebration() {
-            clearInterval(refreshInterval);
-            
-            const celebration = document.createElement('div');
-            celebration.className = 'celebration';
-            
-            const content = document.createElement('div');
-            content.className = 'celebration-content';
-            
-            content.innerHTML = `
-                <h2>🎉 Congratulations! 🎉</h2>
-                <p>Both players reached the finish line!</p>
-                <p>The dog and cat worked together perfectly!</p>
-                <button id="play-again">Play Again</button>
-            `;
-            
-            celebration.appendChild(content);
-            document.body.appendChild(celebration);
-            
-            document.getElementById('play-again').addEventListener('click', function() {
-                fetch('/reset', {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    gameState = data;
-                    document.body.removeChild(celebration);
-                    refreshInterval = setInterval(fetchGameState, 100);
-                })
-                .catch(error => console.error('Error resetting game:', error));
+            .then(data => {
+                // Optionally handle response
+            })
+            .catch(error => {
+                console.error('Move error:', error);
             });
         }
-        
-        // Start the game when the page loads
+
+        // Show the celebration screen
+        function showCelebration() {
+            if (!document.getElementById('celebration-screen')) {
+                const celebration = document.createElement('div');
+                celebration.id = 'celebration-screen';
+                celebration.className = 'celebration';
+                celebration.innerHTML = `
+                    <div class="celebration-content">
+                        <h2>🎉 You Did It! 🎉</h2>
+                        <p>Both players reached the goal!</p>
+                        <button onclick="location.reload()">Play Again</button>
+                    </div>
+                `;
+                document.body.appendChild(celebration);
+            }
+        }
+
+        // Start the game on page load
         window.onload = initGame;
     </script>
 </body>

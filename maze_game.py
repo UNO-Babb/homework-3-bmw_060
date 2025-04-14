@@ -154,31 +154,23 @@ def check_finish():
                     game_state["celebrating"] = True
 
 # Save game state to file
-def save_game(save_name=None):
-    # Create a saveable copy of game state
-    save_state = game_state.copy()
+@app.route('/save-game', methods=['POST'])
+def save_game():
+    data = request.get_json()
+    filename = data['filename']
+    maze = data['maze']
+    game_state = data['gameState']
     
-    # Generate unique ID if not already set
-    if not save_state["save_id"]:
-        save_state["save_id"] = str(uuid.uuid4())
+    save_path = os.path.join('saves', f"{filename}.json")
     
-    # Update save name and time
-    save_state["save_name"] = save_name if save_name else f"AutoSave_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    save_state["save_time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Update game state with save info
-    game_state["save_id"] = save_state["save_id"]
-    game_state["save_name"] = save_state["save_name"]
-    game_state["save_time"] = save_state["save_time"]
-    
-    # Create save file path
-    save_file = os.path.join(SAVES_DIR, f"{save_state['save_id']}.txt")
-    
-    # Write to file
-    with open(save_file, 'w') as f:
-        json.dump(save_state, f, indent=2)
-    
-    return save_state
+    try:
+        with open(save_path, 'w') as f:
+            json.dump({'maze': maze, 'gameState': game_state}, f)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error saving game: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
 
 # Load game state from file
 def load_game(save_id):
