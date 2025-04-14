@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Maze Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+        }
+        
+        .game-container {
+            margin: 0 auto;
+            max-width: 800px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .game-info {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+        }
+        
+        .player-info {
+            text-align: left;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #eee;
+        }
+        
+        #maze {
+            display: grid;
+            grid-template-columns: repeat(12, 40px);
+            grid-template-rows: repeat(12, 40px);
+            gap: 1px;
+            margin: 0 auto;
+            width: fit-content;
+        }
+        
+        .cell {
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            font-size: 10px;
+            position: relative;
+        }
+        
+        .path {
+            background-color: #f9f9f9;
+        }
+        
+        .black-wall {
+            background-color: #333;
+        }
+        
+        .orange-wall {
+            background-color: #FFA500;
+        }
+        
+        .white-wall {
+            background-color: #E0E0E0;
+        }
+        
+        .start {
+            background-color: #C8E6C9;
+        }
+        
+        .finish {
+            background-color: #BBDEFB;
+        }
+        
+        .switch {
+            background-color: #9575CD;
+        }
+        
+        .hazard {
+            background-color: #FF5252;
+        }
+        
+        .player {
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            border-radius: 50%;
+            z-index: 10;
+        }
+        
+        .dog {
+            background-color: white;
+            border: 2px solid #555;
+        }
+        
+        .cat {
+            background-color: orange;
+            border: 2px solid #555;
+        }
+        
+        .celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .celebration-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .celebration h2 {
+            color: #4CAF50;
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #388E3C;
+        }
+        
+        .icon {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Collaborative Maze Game</h1>
+        
+        <div class="game-info">
+            <div class="player-info">
+                <h3>White Dog (Player 1)</h3>
+                <p>Controls: Arrow Keys</p>
+                <p>Special: Can pass through white walls</p>
+            </div>
+            <div class="player-info">
+                <h3>Orange Cat (Player 2)</h3>
+                <p>Controls: WASD Keys</p>
+                <p>Special: Can pass through orange walls</p>
+            </div>
+        </div>
+        
+        <div id="maze"></div>
+        
+        <div style="margin-top: 20px;">
+            <p><strong>Legend:</strong></p>
+            <p>⬛ Black Wall (Impassable) | 🟧 Orange Wall (Cat Only) | ⬜ White Wall (Dog Only) | 🚪 Start | 🏁 Finish | 🔴 Hazard | 🔵 Switch</p>
+        </div>
+    </div>
+    
+    <script>
+        // Game variables
+        let maze = [];
+        let gameState = {};
+        let refreshInterval;
+        let keyState = {};
+        
+        // Initialize the game
+        function initGame() {
+            fetchGameState();
+            refreshInterval = setInterval(fetchGameState, 100);
+            setupKeyListeners();
+        }
+        
+        // Fetch current game state from the server
+        function fetchGameState() {
+            fetch('/state')
+                .then(response => response.json())
+                .then(data => {
+                    maze = data.maze;
+                    gameState = data.game_state;
+                    renderMaze();
+                    
+                    if (gameState.celebrating) {
+                        showCelebration();
+                    }
+                })
+                .catch(error => console.error('Error fetching game state:', error));
+        }
+        
+        // Render the maze based on current state
+        function renderMaze() {
+            const mazeElement = document.getElementById('maze');
+            mazeElement.innerHTML = '';
+            
+            for (let y = 0; y < maze.length; y++) {
+                for (let x = 0; x < maze[y].length; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    
+                    // Set cell appearance based on maze value
+                    switch (maze[y][x]) {
+                        case 0: // Empty path
+                            cell.classList.add('path');
+                            break;
+                        case 1: // Black wall
+                            cell.classList.add('black-wall');
+                            break;
+                        case 2: // Orange wall
+                            cell.classList.add('orange-wall');
+                            break;
+                        case 3: // White wall
+                            cell.classList.add('white-wall');
+                            break;
+                        case 4: // Start
+                            cell.classList.add('start');
+                            cell.innerHTML = '<span class="icon">🚪</span>';
+                            break;
+                        case 5: // Finish
+                            cell.classList.add('finish');
+                            cell.innerHTML = '<span class="icon">🏁</span>';
+                            break;
+                        case 6: // Switch
+                            cell.classList.add('switch');
+                            if (gameState.switches.some(s => s.x === x && s.y === y && s.active)) {
+                                cell.innerHTML = '<span class="icon">🔵</span>';
+                            } else {
+                                cell.innerHTML = '<span class="icon">✅</span>';
+                            }
+                            break;
+                    }
+                    
+                    // Add hazards
+                    if (gameState.hazards.some(h => h.x === x && h.y === y)) {
+                        cell.classList.add('hazard');
+                        cell.innerHTML = '<span class="icon">🔴</span>';
+                    }
+                    
+                    // Add data attributes for debugging
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    
+                    mazeElement.appendChild(cell);
+                }
+            }
+            
+            // Add players
+            addPlayer('dog', gameState.players.dog.x, gameState.players.dog.y);
+            addPlayer('cat', gameState.players.cat.x, gameState.players.cat.y);
+        }
+        
+        // Add a player to the maze
+        function addPlayer(player, x, y) {
+            const cells = document.querySelectorAll('.cell');
+            const cellIndex = y * maze[0].length + x;
+            
+            if (cellIndex >= 0 && cellIndex < cells.length) {
+                const playerElement = document.createElement('div');
+                playerElement.className = `player ${player}`;
+                playerElement.innerHTML = player === 'dog' ? '🐕' : '🐱';
+                cells[cellIndex].appendChild(playerElement);
+            }
+        }
+        
+        // Set up keyboard event listeners
+        function setupKeyListeners() {
+            // Track key state (down/up)
+            document.addEventListener('keydown', function(e) {
+                keyState[e.key] = true;
+                handleKeyInput(e.key);
+                e.preventDefault(); // Prevent scrolling when using arrow keys
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                keyState[e.key] = false;
+                e.preventDefault();
+            });
+        }
+        
+        // Handle keyboard input for player movement
+        function handleKeyInput(key) {
+            let player = null;
+            let direction = null;
+            
+            // Dog controls (arrow keys)
+            if (key === 'ArrowUp') {
+                player = 'dog';
+                direction = 'up';
+            } else if (key === 'ArrowDown') {
+                player = 'dog';
+                direction = 'down';
+            } else if (key === 'ArrowLeft') {
+                player = 'dog';
+                direction = 'left';
+            } else if (key === 'ArrowRight') {
+                player = 'dog';
+                direction = 'right';
+            }
+            
+            // Cat controls (WASD)
+            else if (key === 'w' || key === 'W') {
+                player = 'cat';
+                direction = 'up';
+            } else if (key === 's' || key === 'S') {
+                player = 'cat';
+                direction = 'down';
+            } else if (key === 'a' || key === 'A') {
+                player = 'cat';
+                direction = 'left';
+            } else if (key === 'd' || key === 'D') {
+                player = 'cat';
+                direction = 'right';
+            }
+            
+            if (player && direction) {
+                movePlayer(player, direction);
+            }
+        }
+        
+        // Send player movement to server
+        function movePlayer(player, direction) {
+            fetch('/move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    player: player,
+                    direction: direction
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                gameState = data;
+                renderMaze();
+                
+                if (gameState.celebrating) {
+                    showCelebration();
+                }
+            })
+            .catch(error => console.error('Error moving player:', error));
+        }
+        
+        // Show celebration when both players reach the finish
+        function showCelebration() {
+            clearInterval(refreshInterval);
+            
+            const celebration = document.createElement('div');
+            celebration.className = 'celebration';
+            
+            const content = document.createElement('div');
+            content.className = 'celebration-content';
+            
+            content.innerHTML = `
+                <h2>🎉 Congratulations! 🎉</h2>
+                <p>Both players reached the finish line!</p>
+                <p>The dog and cat worked together perfectly!</p>
+                <button id="play-again">Play Again</button>
+            `;
+            
+            celebration.appendChild(content);
+            document.body.appendChild(celebration);
+            
+            document.getElementById('play-again').addEventListener('click', function() {
+                fetch('/reset', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    gameState = data;
+                    document.body.removeChild(celebration);
+                    refreshInterval = setInterval(fetchGameState, 100);
+                })
+                .catch(error => console.error('Error resetting game:', error));
+            });
+        }
+        
+        // Start the game when the page loads
+        window.onload = initGame;
+    </script>
+</body>
+</html>
